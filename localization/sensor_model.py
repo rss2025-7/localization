@@ -39,6 +39,8 @@ class SensorModel:
 
         # Your sensor table will be a `table_width` x `table_width` np array:
         self.table_width = 201
+        self.z_max = 200.0
+        self.z_min = 0.0
         ####################################
 
         node.get_logger().info("%s" % self.map_topic)
@@ -86,36 +88,27 @@ class SensorModel:
         returns:
             No return type. Directly modify `self.sensor_model_table`.
         """
-        d_min = 0
-        d_max = 200
-        z_min = 0
-        z_max = 200
-        epsilon = 0.1
-
-        d = np.linspace(d_min, d_max, self.table_width)
-        row = np.linspace(z_min, z_max, self.table_width)
+        d = np.linspace(self.z_min, self.z_max, self.table_width)
+        row = np.linspace(self.z_min, self.z_max, self.table_width)
         z_ks = np.tile(row[:, np.newaxis], (1, self.table_width))
-        z_max = np.max(z_ks)
+        self.z_max = np.max(z_ks)
 
         p_hit_coeff = 1 / np.sqrt(2 * np.pi * self.sigma_hit**2)
-        p_hit = np.where((z_ks >= 0) & (z_ks <= z_max), p_hit_coeff * np.exp(-(z_ks-d)**2 / (2*self.sigma_hit**2)), 0.0)
-        p_hit_row_sums = p_hit.sum(axis=1, keepdims=True)
+        p_hit = np.where((z_ks >= 0) & (z_ks <= self.z_max), p_hit_coeff * np.exp(-(z_ks-d)**2 / (2*self.sigma_hit**2)), 0.0)
+        p_hit_row_sums = p_hit.sum(axis=0, keepdims=True)
         p_hit = np.where(p_hit_row_sums != 0, p_hit / p_hit_row_sums, 0)
 
         p_short = np.where((z_ks >= 0) & (z_ks <= d) & (d != 0), (2/np.where(d != 0, d, 1)) * (1 - z_ks/np.where(d != 0, d, 1)), 0.0)
-        p_max = np.where((z_ks >= z_max - epsilon) & (z_ks <= z_max), 1/epsilon, 0.0)
-        p_rand = np.where((z_ks >= 0) & (z_ks <= z_max), 1/z_max, 0.0)
+        p_max = np.where((z_ks == self.z_max), 1.0, 0.0)
+        p_rand = np.where((z_ks >= 0) & (z_ks <= self.z_max), 1/self.z_max, 0.0)
 
         self.sensor_model_table = self.alpha_hit * p_hit + \
-                                  self.alpha_short + p_short + \
-                                  self.alpha_max + p_max + \
-                                  self.alpha_rand + p_rand
+                                  self.alpha_short * p_short + \
+                                  self.alpha_max * p_max + \
+                                  self.alpha_rand * p_rand
         
-        # fig = plt.figure(figsize=(8, 6))
-        # ax = fig.add_subplot(111, projection='3d')
-
-        # ax.plot_surface(row, d, self.sensor_model_table, cmap='viridis')
-        # plt.show()
+        normalized_table_sums = self.sensor_model_table.sum(axis=0, keepdims=True)
+        self.sensor_model_table = np.where(normalized_table_sums != 0, self.sensor_model_table / normalized_table_sums, 0)
 
     def evaluate(self, particles, observation):
         """
@@ -150,7 +143,23 @@ class SensorModel:
         # This produces a matrix of size N x num_beams_per_particle 
 
         scans = self.scan_sim.scan(particles)
+        observation /= self.resolution * self.lidar_scale_to_map_scale
+        scans /= self.resolution * self.lidar_scale_to_map_scale
 
+        observation = observation.astype(int)
+        scans = scans.astype(int)
+
+        np.clip(observation, a_min=0.0, a_max=self.z_max)
+        np.clip(scans, a_min=0.0, a_max=self.z_max)
+
+        probabilities = []
+        for particle_ground_truths in scans:
+            indices = np.array(list(zip(observation, particle_ground_truths)))
+            probability = self.sensor_model_table[indices[:,0], indices[:,1]] 
+            probability = np.prod(probability)
+            probabilities.append(probability)
+        
+        return np.array(probabilities)
         ####################################
 
     def map_callback(self, map_msg):
