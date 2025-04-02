@@ -1,6 +1,8 @@
 from localization.sensor_model import SensorModel
 from localization.motion_model import MotionModel
 
+import numpy as np
+
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
 
@@ -25,7 +27,7 @@ class ParticleFilter(Node):
         #     a twist component, you will only be provided with the
         #     twist component, so you should rely only on that
         #     information, and *not* use the pose component.
-        
+
         self.declare_parameter('odom_topic', "/odom")
         self.declare_parameter('scan_topic', "/scan")
 
@@ -63,6 +65,10 @@ class ParticleFilter(Node):
         self.motion_model = MotionModel(self)
         self.sensor_model = SensorModel(self)
 
+        # Particle filter parameters
+        self.num_particles = 200 # Adjustable
+        self.particles = np.zeros((self.num_particles, 3))
+
         self.get_logger().info("=============+READY+=============")
 
         # Implement the MCL algorithm
@@ -74,7 +80,34 @@ class ParticleFilter(Node):
         #
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
+    def pose_callback(self, msg):
+        """
+        initialize particles
+        """
+        pose = msg.pose.pose # pose type
+        x, y = pose.position.x, pose.position.y
+        theta = self.quaternion_to_yaw(pose.orientation)
 
+        # x, y, z, rotation about x, y, z
+        covariance_matrix = msg.pose.covariance
+
+        sigma_x = np.sqrt(covariance_matrix[0])
+        sigma_y = np.sqrt(covariance_matrix[7])
+        sigma_theta = np.sqrt(covariance_matrix[35])
+        # Initialize particles around intiail pose
+        self.particles[:, 0] = np.random.normal(x, sigma_x, self.num_particles)
+        self.particles[:, 1] = np.random.normal(y, sigma_y, self.num_particles)
+        self.particles[:, 2] = np.random.normal(theta, sigma_theta, self.num_particles)
+
+    def quaternion_to_yaw(self, quaternion):
+        """
+        Convert a quaternion to yaw angle
+        """
+        qx = quaternion.x
+        qy = quaternion.y
+        qz = quaternion.z
+        qw = quaternion.w
+        return np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy**2 + qz**2))
 
 def main(args=None):
     rclpy.init(args=args)
