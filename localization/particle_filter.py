@@ -65,8 +65,13 @@ class ParticleFilter(Node):
         self.motion_model = MotionModel(self)
         self.sensor_model = SensorModel(self)
 
+        # Deterministic motion model
+        self.declare_parameter('deterministic', False)
+        self.motion_model.deterministic = self.get_parameter('deterministic').get_parameter_value().bool_value
+
         # Particle filter parameters
-        self.num_particles = 200 # Adjustable
+        self.declare_parameter('num_particles', 200)
+        self.num_particles = self.get_parameter('num_particles').get_parameter_value().integer_value
         self.particles = np.zeros((self.num_particles, 3))
 
         self.get_logger().info("=============+READY+=============")
@@ -94,6 +99,7 @@ class ParticleFilter(Node):
         sigma_x = np.sqrt(covariance_matrix[0])
         sigma_y = np.sqrt(covariance_matrix[7])
         sigma_theta = np.sqrt(covariance_matrix[35])
+
         # Initialize particles around intiail pose
         self.particles[:, 0] = np.random.normal(x, sigma_x, self.num_particles)
         self.particles[:, 1] = np.random.normal(y, sigma_y, self.num_particles)
