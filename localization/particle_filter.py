@@ -6,8 +6,11 @@ from geometry_msgs.msg import PoseWithCovarianceStamped
 
 from rclpy.node import Node
 import rclpy
+import numpy as np
+from scipy import signal
 
 assert rclpy
+
 
 
 class ParticleFilter(Node):
@@ -28,6 +31,7 @@ class ParticleFilter(Node):
         
         self.declare_parameter('odom_topic', "/odom")
         self.declare_parameter('scan_topic', "/scan")
+        self.declare_parameter('num_particles', 100)
 
         scan_topic = self.get_parameter("scan_topic").get_parameter_value().string_value
         odom_topic = self.get_parameter("odom_topic").get_parameter_value().string_value
@@ -39,6 +43,7 @@ class ParticleFilter(Node):
         self.odom_sub = self.create_subscription(Odometry, odom_topic,
                                                  self.odom_callback,
                                                  1)
+        self.num_particles = self.get_parameter("num_particles").get_parameter_value().integer_value
 
         #  *Important Note #2:* You must respond to pose
         #     initialization requests sent to the /initialpose
@@ -74,6 +79,36 @@ class ParticleFilter(Node):
         #
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
+        self.N = self.num_particles
+        self.particles = np.zeros(self.N, 3)
+        self.weights = np.ones(self.N)
+        self.average = None
+
+    def laser_callback(self, sensor_msg):
+        resample_prob = np.random.binomial(n=1, p = 0.1)
+        lidar_data = signal.decimate(sensor_msg.ranges,10) ###Downsample 1000 ---> 100
+        new_weights = self.sensor_model.evaluate(self.particles, lidar_data)
+        if resample_prob == 1:
+            particle_indices = np.random.choice(self.N, self.N, p = new_weights)
+            self.weights = np.ones(self.N)
+            self.particles = self.particles[particle_indices, :]
+            best_idx = np.argmax(new_weights)
+            best_particle = self.particles[best_idx, :]
+        else:
+            self.weights *= new_weights
+            best_idx = np.argmax(self.weights)
+            best_particle = self.particles[best_idx, :]
+
+        self.average = best_particle
+        
+
+
+    def odom_callback(self, odom_msg):
+        delta = odom_msg.twist
+        odom_velo = [delta[0], delta[7], delta[-1]]
+        self.particles = self.motion_model.evaluate(self.particles, odom_velo)
+        self.average = self.particles[0,:]
+
 
 
 def main(args=None):
