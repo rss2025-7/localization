@@ -130,12 +130,25 @@ class ParticleFilter(Node):
             best_particle = self.particles[best_idx, :]
 
         self.average = best_particle
+        self.odom_publisher(self.average)
+
+
 
     def odom_callback(self, odom_msg):
         delta = odom_msg.twist
         odom_velo = [delta[0], delta[7], delta[-1]]
         self.particles = self.motion_model.evaluate(self.particles, odom_velo)
         self.average = self.particles[0,:]
+        self.odom_publisher(self.average)
+
+    def odom_publisher(self, best_particle):
+        odom = Odometry()
+        pose = PoseWithCovarianceStamped()
+        p_arr = np.zeros(36)
+        p_arr[0], p_arr[7], p_arr[-1] = best_particle
+        pose.covariance = p_arr
+        odom.pose = pose
+        self.odom_pub.publish(odom)
 
 
     def quaternion_to_yaw(self, quaternion):
