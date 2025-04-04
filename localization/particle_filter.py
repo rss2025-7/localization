@@ -130,8 +130,6 @@ class ParticleFilter(Node):
             best_particle = self.particles[best_idx, :]
 
         self.average = best_particle
-        
-
 
     def odom_callback(self, odom_msg):
         delta = odom_msg.twist
