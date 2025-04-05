@@ -4,8 +4,10 @@ from localization.motion_model import MotionModel
 import numpy as np
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, PoseWithCovariance, Pose
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseWithCovariance, PoseArray
 from sensor_msgs.msg import LaserScan
+from tf_transformations import quaternion_from_euler
+
 from rclpy.node import Node
 import rclpy
 import numpy as np
@@ -146,16 +148,19 @@ class ParticleFilter(Node):
         odom_velo = [delta[0], delta[7], delta[-1]]
         self.particles = self.motion_model.evaluate(self.particles, odom_velo)
         self.average = self.particles[0,:]
-        self.odom_publisher(self.average)
+        self.odom_publisher(self.average, odom_msg.twist)
 
-    def odom_publisher(self, best_particle):
+    def odom_publisher(self, best_particle, twist):
         odom = Odometry()
-        pose = PoseWithCovarianceStamped().pose
-        p_arr = np.zeros(36)
-        p_arr[0], p_arr[7], p_arr[-1] = best_particle
-        pose.postion = None
-        pose.orientation = None
-        odom.pose = pose
+        odom.header.child_frame_id = "base_link_pf" # change for sim/real
+
+        orientation = odom.pose.pose.orientation
+        orientation.x, orientation.y, orientation.z, orientation.w = quaternion_from_euler(0, 0, best_particle[2])
+
+        odom_pose = odom.pose.pose.position
+        odom_pose.pose = best_particle[0], best_particle[1], 0
+
+        odom.twist = twist
         self.odom_pub.publish(odom)
 
 

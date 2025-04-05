@@ -41,6 +41,8 @@ setup(
             'particle_filter = localization.particle_filter:main',
             'sensor_model_test = localization.test.sensor_model_test:main',
             'motion_model_test = localization.test.motion_model_test:main',
+            'test_drive = localization.test_drive:main',
+            'odom_noise = localization.GaussianNoise:main',
         ],
     },
 
