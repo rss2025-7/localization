@@ -154,6 +154,8 @@ class ParticleFilter(Node):
         odom = Odometry()
         odom.child_frame_id = "base_link_pf" # change for sim/real
 
+        odom.header.stamp = self.get_clock().now().to_msg()
+
         orientation = odom.pose.pose.orientation
         orientation.x, orientation.y, orientation.z, orientation.w = quaternion_from_euler(0, 0, best_particle[2])
         odom.pose.pose.orientation = orientation
@@ -163,9 +165,10 @@ class ParticleFilter(Node):
         odom.pose.pose.position = odom_pose
 
         # odom.twist = twist # don't know if necessary
-        self.get_logger().info(f"help")
+        # self.get_logger().info(f"help")
 
         self.odom_pub.publish(odom)
+        self.visualize()
 
 
     def quaternion_to_yaw(self, quaternion):
@@ -183,7 +186,7 @@ class ParticleFilter(Node):
 
         pose_msg.position.x = x
         pose_msg.position.y = y
-        pose_msg.position.z = 0
+        pose_msg.position.z = 0.0
 
         xq,yq,zq,wq = quaternion_from_euler(0,0,t)
 
@@ -193,8 +196,8 @@ class ParticleFilter(Node):
         pose_msg.orientation.w = wq
 
         return pose_msg
-    
-    
+
+
     def visualize(self):
         msg = PoseArray()
         msg.header.frame_id = "map"
@@ -203,7 +206,7 @@ class ParticleFilter(Node):
         msg.poses = [self.particle2pose(part) for part in self.particles]
 
         self.visual_pub.publish(msg)
-    
+
 
 def main(args=None):
     rclpy.init(args=args)
