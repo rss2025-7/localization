@@ -150,17 +150,21 @@ class ParticleFilter(Node):
         self.average = self.particles[0,:]
         self.odom_publisher(self.average, odom_msg.twist)
 
-    def odom_publisher(self, best_particle, twist):
+    def odom_publisher(self, best_particle, twist = None):
         odom = Odometry()
-        odom.header.child_frame_id = "base_link_pf" # change for sim/real
+        odom.child_frame_id = "base_link_pf" # change for sim/real
 
         orientation = odom.pose.pose.orientation
         orientation.x, orientation.y, orientation.z, orientation.w = quaternion_from_euler(0, 0, best_particle[2])
+        odom.pose.pose.orientation = orientation
 
         odom_pose = odom.pose.pose.position
-        odom_pose.pose = best_particle[0], best_particle[1], 0
+        odom_pose.x, odom_pose.y, odom_pose.z = best_particle[0], best_particle[1], 0.0
+        odom.pose.pose.position = odom_pose
 
-        odom.twist = twist
+        # odom.twist = twist # don't know if necessary
+        self.get_logger().info(f"help")
+
         self.odom_pub.publish(odom)
 
 
