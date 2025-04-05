@@ -4,9 +4,8 @@ from localization.motion_model import MotionModel
 import numpy as np
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, PoseWithCovariance, Pose
 from sensor_msgs.msg import LaserScan
-
 from rclpy.node import Node
 import rclpy
 import numpy as np
@@ -66,6 +65,8 @@ class ParticleFilter(Node):
         #     "/map" frame.
 
         self.odom_pub = self.create_publisher(Odometry, "/pf/pose/odom", 1)
+
+        self.visual_pub = self.create_publisher(PoseArray, "/particle_viz", 1)
 
         # Initialize the models
         self.motion_model = MotionModel(self)
@@ -152,7 +153,8 @@ class ParticleFilter(Node):
         pose = PoseWithCovarianceStamped().pose
         p_arr = np.zeros(36)
         p_arr[0], p_arr[7], p_arr[-1] = best_particle
-        pose.covariance = p_arr
+        pose.postion = None
+        pose.orientation = None
         odom.pose = pose
         self.odom_pub.publish(odom)
 
@@ -166,6 +168,7 @@ class ParticleFilter(Node):
         qz = quaternion.z
         qw = quaternion.w
         return np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy**2 + qz**2))
+    
 
 def main(args=None):
     rclpy.init(args=args)
