@@ -4,7 +4,7 @@ from localization.motion_model import MotionModel
 import numpy as np
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseWithCovariance, PoseArray
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseWithCovariance, PoseArray, Pose
 from sensor_msgs.msg import LaserScan
 from tf_transformations import quaternion_from_euler
 
@@ -173,6 +173,32 @@ class ParticleFilter(Node):
         qz = quaternion.z
         qw = quaternion.w
         return np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy**2 + qz**2))
+    def particle2pose(self, particle):
+        x,y,t = particle
+        pose_msg = Pose()
+
+        pose_msg.position.x = x
+        pose_msg.position.y = y
+        pose_msg.position.z = 0
+
+        xq,yq,zq,wq = quaternion_from_euler(0,0,t)
+
+        pose_msg.orientation.x = xq
+        pose_msg.orientation.y = yq
+        pose_msg.orientation.z = zq
+        pose_msg.orientation.w = wq
+
+        return pose_msg
+    
+    
+    def visualize(self):
+        msg = PoseArray()
+        msg.header.frame_id = "map"
+        msg.header.stamp = self.get_clock().now().to_msg()
+
+        msg.poses = [self.particle2pose(part) for part in self.particles]
+
+        self.visual_pub.publish(msg)
     
 
 def main(args=None):
