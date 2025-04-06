@@ -84,6 +84,7 @@ class ParticleFilter(Node):
         self.num_particles = self.get_parameter('num_particles').get_parameter_value().integer_value
         self.particles = np.zeros((self.num_particles, 3))
         self.weights = np.ones(self.N)
+        self.last_time = self.get_clock().now()
 
         self.get_logger().info("=============+READY+=============")
 
@@ -124,7 +125,8 @@ class ParticleFilter(Node):
         resample_prob = np.random.binomial(n=1, p = 0.1)
         lidar_data = signal.decimate(sensor_msg.ranges,10) ###Downsample 1000 ---> 100
         new_weights = self.sensor_model.evaluate(self.particles, lidar_data)
-        if resample_prob == 1:
+        if resample_prob == 0:
+            print(1)
             new_weights_sum = new_weights.sum()
             new_weights = new_weights / new_weights_sum
             particle_indices = np.random.choice(self.N, self.N, p = new_weights)
@@ -133,6 +135,7 @@ class ParticleFilter(Node):
             best_idx = np.argmax(new_weights)
             best_particle = self.particles[best_idx, :]
         else:
+            print(0)
             # self.get_logger().info(f'Types: {type(self.weights), type(new_weights)}')
             self.weights *= new_weights
             best_idx = np.argmax(self.weights)
@@ -144,9 +147,16 @@ class ParticleFilter(Node):
 
 
     def odom_callback(self, odom_msg):
-        delta = odom_msg.twist.covariance
-        odom_velo = [delta[0], delta[7], delta[-1]]
-        self.particles = self.motion_model.evaluate(self.particles, odom_velo)
+        odom_velo = odom_msg.twist.twist.linear
+        xdot, ydot, thetadot = odom_velo.x, odom_velo.y, odom_msg.twist.twist.angular.z
+
+        current_time = self.get_clock().now()
+        dt = (current_time - self.last_time).nanoseconds / 1e9  # seconds
+        self.last_time = current_time
+        
+        odom_info = np.array([xdot*dt, ydot*dt, thetadot*dt])
+    
+        self.particles = self.motion_model.evaluate(self.particles, odom_info)
         self.average = self.particles[0,:]
         self.odom_publisher(self.average, odom_msg.twist)
         
@@ -181,6 +191,7 @@ class ParticleFilter(Node):
         qz = quaternion.z
         qw = quaternion.w
         return np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy**2 + qz**2))
+    
     def particle2pose(self, particle):
         x,y,t = particle
         pose_msg = Pose()
