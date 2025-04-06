@@ -11,7 +11,7 @@ from tf_transformations import quaternion_from_euler
 from rclpy.node import Node
 import rclpy
 import numpy as np
-from scipy import signal
+import scipy
 
 assert rclpy
 
@@ -122,27 +122,23 @@ class ParticleFilter(Node):
         # self.average = None
 
     def laser_callback(self, sensor_msg):
-        resample_prob = np.random.binomial(n=1, p = 0.1)
-        lidar_data = signal.decimate(sensor_msg.ranges,10) ###Downsample 1000 ---> 100
+        resample_prob = np.random.binomial(n=1, p = 0.2)
+        lidar_data = np.array(sensor_msg.ranges)
         new_weights = self.sensor_model.evaluate(self.particles, lidar_data)
         if resample_prob == 0:
-            print(1)
             new_weights_sum = new_weights.sum()
-            new_weights = new_weights / new_weights_sum
-            particle_indices = np.random.choice(self.N, self.N, p = new_weights)
+            particle_indices = np.random.choice(self.N, self.N, p = new_weights/new_weights_sum)
             self.weights = np.ones(self.N)
             self.particles = self.particles[particle_indices, :]
-            best_idx = np.argmax(new_weights)
-            best_particle = self.particles[best_idx, :]
+            # best_idx = np.argmax(new_weights)
+            # best_particle = self.particles[best_idx, :]
         else:
-            print(0)
             # self.get_logger().info(f'Types: {type(self.weights), type(new_weights)}')
             self.weights *= new_weights
-            best_idx = np.argmax(self.weights)
-            best_particle = self.particles[best_idx, :]
+            # best_idx = np.argmax(self.weights)
+            # best_particle = self.particles[best_idx, :]
 
-        self.average = best_particle
-        self.odom_publisher(self.average)
+        self.odom_publisher()
 
 
 
@@ -157,15 +153,18 @@ class ParticleFilter(Node):
         odom_info = np.array([xdot*dt, ydot*dt, thetadot*dt])
     
         self.particles = self.motion_model.evaluate(self.particles, odom_info)
-        self.average = self.particles[0,:]
-        self.odom_publisher(self.average, odom_msg.twist)
+        self.odom_publisher()
         
 
-    def odom_publisher(self, best_particle, twist = None):
+    def odom_publisher(self):
         odom = Odometry()
         odom.child_frame_id = "base_link_pf" # change for sim/real
 
         odom.header.stamp = self.get_clock().now().to_msg()
+
+        bestx, besty= np.average(self.particles[:,0], weights = self.weights), np.average(self.particles[:,1], weights = self.weights)
+        best_theta = np.arctan2(np.sum(self.weights*np.sin(self.particles[:,2])), np.sum(self.weights*np.cos(self.particles[:,2])))
+        best_particle = np.array([bestx, besty, best_theta])
 
         orientation = odom.pose.pose.orientation
         orientation.x, orientation.y, orientation.z, orientation.w = quaternion_from_euler(0, 0, best_particle[2])
