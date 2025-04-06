@@ -149,12 +149,12 @@ class ParticleFilter(Node):
         current_time = self.get_clock().now()
         dt = (current_time - self.last_time).nanoseconds / 1e9  # seconds
         self.last_time = current_time
-        
+
         odom_info = np.array([xdot*dt, ydot*dt, thetadot*dt])
-    
+
         self.particles = self.motion_model.evaluate(self.particles, odom_info)
         self.odom_publisher()
-        
+
 
     def odom_publisher(self):
         odom = Odometry()
@@ -162,7 +162,11 @@ class ParticleFilter(Node):
 
         odom.header.stamp = self.get_clock().now().to_msg()
 
-        bestx, besty= np.average(self.particles[:,0], weights = self.weights), np.average(self.particles[:,1], weights = self.weights)
+        bestx = np.sum(self.weights * self.particles[:, 0]) / np.sum(self.weights)
+        besty = np.sum(self.weights * self.particles[:, 1]) / np.sum(self.weights)
+
+        # bestx, besty= np.average(self.particles[:,0]), np.average(self.particles[:,1]) # doesn't work
+        
         best_theta = np.arctan2(np.sum(self.weights*np.sin(self.particles[:,2])), np.sum(self.weights*np.cos(self.particles[:,2])))
         best_particle = np.array([bestx, besty, best_theta])
 
@@ -190,7 +194,7 @@ class ParticleFilter(Node):
         qz = quaternion.z
         qw = quaternion.w
         return np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy**2 + qz**2))
-    
+
     def particle2pose(self, particle):
         x,y,t = particle
         pose_msg = Pose()

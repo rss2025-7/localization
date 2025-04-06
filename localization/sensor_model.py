@@ -1,6 +1,6 @@
 import numpy as np
 from scan_simulator_2d import PyScanSimulator2D
-# Try to change to just `from scan_simulator_2d import PyScanSimulator2D` 
+# Try to change to just `from scan_simulator_2d import PyScanSimulator2D`
 # if any error re: scan_simulator_2d occurs
 
 from tf_transformations import euler_from_quaternion
@@ -76,7 +76,7 @@ class SensorModel:
         """
         Generate and store a table which represents the sensor model.
 
-        For each discrete computed range value, this provides the probability of 
+        For each discrete computed range value, this provides the probability of
         measuring any (discrete) range. This table is indexed by the sensor model
         at runtime by discretizing the measurements and computed ranges from
         RangeLibc.
@@ -109,7 +109,7 @@ class SensorModel:
                                   self.alpha_short * p_short + \
                                   self.alpha_max * p_max + \
                                   self.alpha_rand * p_rand
-        
+
         # self.node.get_logger().info(f'OG BEFORE NORM: {self.sensor_model_table}')
         normalized_table_sums = self.sensor_model_table.sum(axis=0, keepdims=True)
         self.sensor_model_table = np.where(normalized_table_sums != 0, self.sensor_model_table / normalized_table_sums, 0)
@@ -147,7 +147,7 @@ class SensorModel:
         #
         # You will probably want to use this function
         # to perform ray tracing from all the particles.
-        # This produces a matrix of size N x num_beams_per_particle 
+        # This produces a matrix of size N x num_beams_per_particle
 
         scans = self.scan_sim.scan(particles)
         observation /= self.resolution * self.lidar_scale_to_map_scale
@@ -162,7 +162,7 @@ class SensorModel:
         probabilities = []
         for particle_ground_truths in scans:
             indices = np.array(list(zip(observation, particle_ground_truths)))
-            probability = self.sensor_model_table[indices[:,0], indices[:,1]] 
+            probability = self.sensor_model_table[indices[:,0], indices[:,1]]
             # self.node.get_logger().info(f'SENSOR ORIGINAL PROBABILITIES: {len(probabilities)}, {np.array(probabilities)}')
             probability = np.prod(probability)
             probabilities.append(probability)
