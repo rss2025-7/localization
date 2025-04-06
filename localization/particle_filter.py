@@ -4,9 +4,11 @@ from localization.motion_model import MotionModel
 import numpy as np
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseWithCovariance, PoseArray, Pose
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseWithCovariance, PoseArray, Pose, TransformStamped
 from sensor_msgs.msg import LaserScan
 from tf_transformations import quaternion_from_euler
+
+from tf2_ros import TransformBroadcaster
 
 from rclpy.node import Node
 import rclpy
@@ -70,6 +72,9 @@ class ParticleFilter(Node):
 
         self.visual_pub = self.create_publisher(PoseArray, "/particle_viz", 1)
 
+        self.tf_broadcaster = TransformBroadcaster(self)
+
+
         # Initialize the models
         self.motion_model = MotionModel(self)
         self.sensor_model = SensorModel(self)
@@ -77,6 +82,7 @@ class ParticleFilter(Node):
         # Deterministic motion model
         self.declare_parameter('deterministic', False)
         self.motion_model.deterministic = self.get_parameter('deterministic').get_parameter_value().bool_value
+        self.sim = False
 
         # Particle filter parameters
         # self.declare_parameter('num_particles', 200)
@@ -122,23 +128,26 @@ class ParticleFilter(Node):
         # self.average = None
 
     def laser_callback(self, sensor_msg):
+
         resample_prob = np.random.binomial(n=1, p = 0.2)
         lidar_data = np.array(sensor_msg.ranges)
         new_weights = self.sensor_model.evaluate(self.particles, lidar_data)
-        if resample_prob == 0:
-            new_weights_sum = new_weights.sum()
-            particle_indices = np.random.choice(self.N, self.N, p = new_weights/new_weights_sum)
-            self.weights = np.ones(self.N)
-            self.particles = self.particles[particle_indices, :]
-            # best_idx = np.argmax(new_weights)
-            # best_particle = self.particles[best_idx, :]
-        else:
-            # self.get_logger().info(f'Types: {type(self.weights), type(new_weights)}')
-            self.weights *= new_weights
-            # best_idx = np.argmax(self.weights)
-            # best_particle = self.particles[best_idx, :]
+        if new_weights is not None:
+            if resample_prob == 0:
+                new_weights = np.power(new_weights, 1/3)
+                new_weights_sum = new_weights.sum() 
+                particle_indices = np.random.choice(self.N, self.N, p = new_weights/new_weights_sum)
+                self.weights = np.ones(self.N)
+                self.particles = self.particles[particle_indices, :]
+                # best_idx = np.argmax(new_weights)
+                # best_particle = self.particles[best_idx, :]
+            else:
+                # self.get_logger().info(f'Types: {type(self.weights), type(new_weights)}')
+                self.weights *= new_weights
+                # best_idx = np.argmax(self.weights)
+                # best_particle = self.particles[best_idx, :]
 
-        self.odom_publisher()
+            self.odom_publisher()
 
 
 
@@ -150,7 +159,7 @@ class ParticleFilter(Node):
         dt = (current_time - self.last_time).nanoseconds / 1e9  # seconds
         self.last_time = current_time
 
-        odom_info = np.array([xdot*dt, ydot*dt, thetadot*dt])
+        odom_info = -1 * np.array([xdot*dt, ydot*dt, thetadot*dt]) #Negative 1 for real robot
 
         self.particles = self.motion_model.evaluate(self.particles, odom_info)
         self.odom_publisher()
@@ -158,7 +167,7 @@ class ParticleFilter(Node):
 
     def odom_publisher(self):
         odom = Odometry()
-        odom.child_frame_id = "base_link_pf" # change for sim/real
+        odom.child_frame_id = "base_link" # change for sim/real
 
         odom.header.stamp = self.get_clock().now().to_msg()
 
@@ -177,6 +186,23 @@ class ParticleFilter(Node):
         odom_pose = odom.pose.pose.position
         odom_pose.x, odom_pose.y, odom_pose.z = best_particle[0], best_particle[1], 0.0
         odom.pose.pose.position = odom_pose
+
+        if not self.sim:
+            t = TransformStamped()
+            t.header.stamp = self.get_clock().now().to_msg()
+            t.header.frame_id = "map"
+            t.child_frame_id = "base_link"
+
+            t.transform.translation.x, t.transform.translation.y, t.transform.translation.z  = bestx, besty, 0.0
+            t.transform.rotation.x = orientation.x
+            t.transform.rotation.y = orientation.y
+            t.transform.rotation.z = orientation.z
+            t.transform.rotation.w = orientation.w
+
+            self.tf_broadcaster.sendTransform(t)
+
+            
+        
 
         # odom.twist = twist # don't know if necessary
         # self.get_logger().info(f"help")

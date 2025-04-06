@@ -169,6 +169,12 @@ class SensorModel:
 
         # self.node.get_logger().info(f'SENSOR MODEL: {len(probabilities)}, {np.array(probabilities)}')
         return np.array(probabilities)
+
+        # observation_broadcasted = np.tile(observation, (scans.shape[0], 1))
+        # probabilities_array = self.sensor_model_table[observation_broadcasted, scans]
+        # probabilities = np.prod(probabilities_array, axis=1)
+
+        return probabilities
         ####################################
 
     def map_callback(self, map_msg):
