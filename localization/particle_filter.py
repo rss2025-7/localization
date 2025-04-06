@@ -149,6 +149,7 @@ class ParticleFilter(Node):
         self.particles = self.motion_model.evaluate(self.particles, odom_velo)
         self.average = self.particles[0,:]
         self.odom_publisher(self.average, odom_msg.twist)
+        
 
     def odom_publisher(self, best_particle, twist = None):
         odom = Odometry()
@@ -163,9 +164,10 @@ class ParticleFilter(Node):
         odom.pose.pose.position = odom_pose
 
         # odom.twist = twist # don't know if necessary
-        self.get_logger().info(f"help")
+        # self.get_logger().info(f"help")
 
         self.odom_pub.publish(odom)
+        self.visualize()
 
 
     def quaternion_to_yaw(self, quaternion):
@@ -181,11 +183,11 @@ class ParticleFilter(Node):
         x,y,t = particle
         pose_msg = Pose()
 
-        pose_msg.position.x = x
-        pose_msg.position.y = y
-        pose_msg.position.z = 0
+        pose_msg.position.x = float(x)
+        pose_msg.position.y = float(y)
+        pose_msg.position.z = 0.0
 
-        xq,yq,zq,wq = quaternion_from_euler(0,0,t)
+        xq,yq,zq,wq = quaternion_from_euler(0.0,0.0,t)
 
         pose_msg.orientation.x = xq
         pose_msg.orientation.y = yq
