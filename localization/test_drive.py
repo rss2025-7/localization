@@ -10,7 +10,7 @@ class AckermannDrivePublisher(Node):
         # Declare parameters for base velocity and angular velocity
         self.declare_parameter('base_velocity', 1.0)  # Base linear velocity
         self.declare_parameter('base_angular_velocity', 0.0)  # Base angular velocity
-        self.declare_parameter('noise_std_dev', 0.1)  # Standard deviation for noise
+        self.declare_parameter('noise_std_dev', 0.0)  # Standard deviation for noise
 
         # Retrieve parameters
         self.base_velocity = self.get_parameter('base_velocity').get_parameter_value().double_value
@@ -25,8 +25,11 @@ class AckermannDrivePublisher(Node):
 
     def publish_ackermann_drive(self):
         # Generate random noise
-        velocity_noise = np.random.normal(0, self.noise_std_dev)
-        angular_velocity_noise = np.random.normal(0, self.noise_std_dev)
+        # velocity_noise = np.random.normal(0, self.noise_std_dev)
+        # angular_velocity_noise = np.random.normal(0, self.noise_std_dev)
+
+        velocity_noise = 0.0
+        angular_velocity_noise = 0.0
 
         # Add noise to base velocity and angular velocity
         noisy_velocity = self.base_velocity + velocity_noise

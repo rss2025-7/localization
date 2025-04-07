@@ -84,7 +84,7 @@ class ParticleFilter(Node):
         # Deterministic motion model
         self.declare_parameter('deterministic', False)
         self.motion_model.deterministic = self.get_parameter('deterministic').get_parameter_value().bool_value
-        self.sim = False
+        self.sim = True
 
         # Particle filter parameters
         # self.declare_parameter('num_particles', 200)
@@ -163,8 +163,11 @@ class ParticleFilter(Node):
         current_time = self.get_clock().now()
         dt = (current_time - self.last_time).nanoseconds / 1e9  # seconds
         self.last_time = current_time
-
-        odom_info = -1 * np.array([xdot*dt, ydot*dt, thetadot*dt]) #Negative 1 for real robot
+        if self.sim:
+            odom_factor = 1
+        else:
+            odom_factor = -1
+        odom_info = odom_factor * np.array([xdot*dt, ydot*dt, thetadot*dt]) #Negative 1 for real robot
 
         self.particles = self.motion_model.evaluate(self.particles, odom_info)
         self.odom_publisher()
