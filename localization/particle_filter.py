@@ -4,9 +4,11 @@ from localization.motion_model import MotionModel
 import numpy as np
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseWithCovariance, PoseArray, Pose, TransformStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseWithCovariance, PoseArray, Pose, TransformStamped, Point
 from sensor_msgs.msg import LaserScan
 from tf_transformations import quaternion_from_euler
+
+from visualization_msgs.msg import Marker
 
 from tf2_ros import TransformBroadcaster
 
@@ -72,6 +74,10 @@ class ParticleFilter(Node):
 
         self.visual_pub = self.create_publisher(PoseArray, "/particle_viz", 1)
 
+        self.position_visualizer = self.create_publisher(Marker, "/previous_positions", 1)
+        self.points = []
+        self.visualize_counter = 0
+
         self.tf_broadcaster = TransformBroadcaster(self)
 
 
@@ -109,6 +115,9 @@ class ParticleFilter(Node):
         """
         initialize particles
         """
+        self.points = []
+        self.visualize_counter = 0
+
         pose = msg.pose.pose # pose type
         x, y = pose.position.x, pose.position.y
         theta = self.quaternion_to_yaw(pose.orientation)
@@ -130,7 +139,7 @@ class ParticleFilter(Node):
         # self.average = None
 
     def laser_callback(self, sensor_msg):
-        resample_prob = np.random.binomial(n=1, p = 0.5)
+        resample_prob = np.random.binomial(n=1, p = 0.3)
 
         downsampled_indices = np.linspace(0, len(sensor_msg.ranges) - 1, self.num_beams_per_particle).astype(int)
         lidar_data = np.array(sensor_msg.ranges)[downsampled_indices]
@@ -167,6 +176,7 @@ class ParticleFilter(Node):
             odom_factor = 1
         else:
             odom_factor = -1
+
         odom_info = odom_factor * np.array([xdot*dt, ydot*dt, thetadot*dt]) #Negative 1 for real robot
 
         self.particles = self.motion_model.evaluate(self.particles, odom_info)
@@ -209,11 +219,18 @@ class ParticleFilter(Node):
 
             self.tf_broadcaster.sendTransform(t)
 
+        if bestx < 100000 and besty < 100000 and not self.visualize_counter % 10:
+            new_point = Point()
+            new_point.x = bestx
+            new_point.y = besty
+            self.points.append(new_point)
         # odom.twist = twist # don't know if necessary
         # self.get_logger().info(f"help")
 
         self.odom_pub.publish(odom)
         self.visualize()
+        self.visualize_position()
+        self.visualize_counter += 1
 
 
     def quaternion_to_yaw(self, quaternion):
@@ -243,6 +260,30 @@ class ParticleFilter(Node):
 
         return pose_msg
 
+    def visualize_position(self):
+        msg = Marker()
+
+        msg.header.frame_id = "map"
+        msg.header.stamp = self.get_clock().now().to_msg()
+
+        msg.points = self.points
+        msg.type = Marker.LINE_STRIP
+
+        color = (1., 0., 0.)
+        # Set the size and color
+        msg.scale.x = 0.1
+        msg.scale.y = 0.1
+        msg.color.a = 1.
+        msg.color.r = color[0]
+        msg.color.g = color[1]
+        msg.color.g = color[2]
+
+        msg.scale.x = 0.1
+        msg.scale.y = 0.1
+        msg.scale.z = 0.1
+
+        self.position_visualizer.publish(msg)
+        self.get_logger().info("Published previous positions")
 
     def visualize(self):
         msg = PoseArray()
