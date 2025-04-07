@@ -79,6 +79,8 @@ class ParticleFilter(Node):
         self.motion_model = MotionModel(self)
         self.sensor_model = SensorModel(self)
 
+        self.num_beams_per_particle = self.sensor_model.num_beams_per_particle
+
         # Deterministic motion model
         self.declare_parameter('deterministic', False)
         self.motion_model.deterministic = self.get_parameter('deterministic').get_parameter_value().bool_value
@@ -128,16 +130,19 @@ class ParticleFilter(Node):
         # self.average = None
 
     def laser_callback(self, sensor_msg):
+        resample_prob = np.random.binomial(n=1, p = 0.5)
 
-        resample_prob = np.random.binomial(n=1, p = 0.2)
-        lidar_data = np.array(sensor_msg.ranges)
+        downsampled_indices = np.linspace(0, len(sensor_msg.ranges) - 1, self.num_beams_per_particle).astype(int)
+        lidar_data = np.array(sensor_msg.ranges)[downsampled_indices]
+
         new_weights = self.sensor_model.evaluate(self.particles, lidar_data)
         if new_weights is not None:
             if resample_prob == 0:
                 new_weights = np.power(new_weights, 1/3)
-                new_weights_sum = new_weights.sum() 
+                new_weights_sum = new_weights.sum()
+                # self.get_logger().info(f"Weight sum: {new_weights_sum}")
                 particle_indices = np.random.choice(self.N, self.N, p = new_weights/new_weights_sum)
-                self.weights = np.ones(self.N)
+                self.weights = new_weights[particle_indices]
                 self.particles = self.particles[particle_indices, :]
                 # best_idx = np.argmax(new_weights)
                 # best_particle = self.particles[best_idx, :]
@@ -147,7 +152,7 @@ class ParticleFilter(Node):
                 # best_idx = np.argmax(self.weights)
                 # best_particle = self.particles[best_idx, :]
 
-            self.odom_publisher()
+            # self.odom_publisher()
 
 
 
@@ -167,15 +172,15 @@ class ParticleFilter(Node):
 
     def odom_publisher(self):
         odom = Odometry()
-        odom.child_frame_id = "base_link" # change for sim/real
-
+        odom.child_frame_id = self.particle_filter_frame # change for sim/real
+        odom.header.frame_id = "map"
         odom.header.stamp = self.get_clock().now().to_msg()
 
         bestx = np.sum(self.weights * self.particles[:, 0]) / np.sum(self.weights)
         besty = np.sum(self.weights * self.particles[:, 1]) / np.sum(self.weights)
 
         # bestx, besty= np.average(self.particles[:,0]), np.average(self.particles[:,1]) # doesn't work
-        
+
         best_theta = np.arctan2(np.sum(self.weights*np.sin(self.particles[:,2])), np.sum(self.weights*np.cos(self.particles[:,2])))
         best_particle = np.array([bestx, besty, best_theta])
 
@@ -191,7 +196,7 @@ class ParticleFilter(Node):
             t = TransformStamped()
             t.header.stamp = self.get_clock().now().to_msg()
             t.header.frame_id = "map"
-            t.child_frame_id = "base_link"
+            t.child_frame_id = self.particle_filter_frame
 
             t.transform.translation.x, t.transform.translation.y, t.transform.translation.z  = bestx, besty, 0.0
             t.transform.rotation.x = orientation.x
@@ -200,9 +205,6 @@ class ParticleFilter(Node):
             t.transform.rotation.w = orientation.w
 
             self.tf_broadcaster.sendTransform(t)
-
-            
-        
 
         # odom.twist = twist # don't know if necessary
         # self.get_logger().info(f"help")
@@ -247,6 +249,7 @@ class ParticleFilter(Node):
         msg.poses = [self.particle2pose(part) for part in self.particles]
 
         self.visual_pub.publish(msg)
+        # self.get_logger().info(f"{self.particles}")
 
 
 def main(args=None):

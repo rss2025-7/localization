@@ -8,8 +8,8 @@ class GaussianNoise(Node):
     def __init__(self):
         super().__init__("gaussian_noise")
 
-        self.declare_parameter('linear_noise_std', 0.1)
-        self.declare_parameter('angular_noise_std', 0.05)
+        self.declare_parameter('linear_noise_std', 0.9)
+        self.declare_parameter('angular_noise_std', 0.85)
 
         self.linear_noise_std = self.get_parameter('linear_noise_std').get_parameter_value().double_value
         self.angular_noise_std = self.get_parameter('angular_noise_std').get_parameter_value().double_value
@@ -52,5 +52,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-        
-        

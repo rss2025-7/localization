@@ -4,9 +4,9 @@ class MotionModel:
 
     def __init__(self, node):
         ####################################
-        self.sigma_dx = 0.05         
-        self.sigma_dy = 0.05        
-        self.sigma_dtheta = np.deg2rad(1)   
+        self.sigma_dx = 0.1
+        self.sigma_dy = 0.1
+        self.sigma_dtheta = np.deg2rad(20) #20 to start -> decrease on tight corners
         self.deterministic = False
         ####################################
 
@@ -37,10 +37,10 @@ class MotionModel:
         else:
             noisy_dx, noisy_dy, noisy_dtheta = dx,dy, dtheta
         ####################################
-        
+
         theta = particles[:, 2]
         particles[:, 0] += np.cos(theta) * noisy_dx - np.sin(theta) * noisy_dy
         particles[:, 1] += np.sin(theta) * noisy_dx + np.cos(theta) * noisy_dy
         particles[:, 2] += noisy_dtheta
-        
+
         return particles

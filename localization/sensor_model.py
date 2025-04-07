@@ -159,20 +159,22 @@ class SensorModel:
         observation = np.clip(observation, a_min=int(0), a_max=int(self.z_max))
         scans = np.clip(scans, a_min=int(0), a_max=int(self.z_max))
 
-        probabilities = []
-        for particle_ground_truths in scans:
-            indices = np.array(list(zip(observation, particle_ground_truths)))
-            probability = self.sensor_model_table[indices[:,0], indices[:,1]]
-            # self.node.get_logger().info(f'SENSOR ORIGINAL PROBABILITIES: {len(probabilities)}, {np.array(probabilities)}')
-            probability = np.prod(probability)
-            probabilities.append(probability)
+        # probabilities = []
+        # for particle_ground_truths in scans:
+        #     indices = np.array(list(zip(observation, particle_ground_truths)))
+        #     probability = self.sensor_model_table[indices[:,0], indices[:,1]]
+        #     # self.node.get_logger().info(f'SENSOR ORIGINAL PROBABILITIES: {len(probabilities)}, {np.array(probabilities)}')
+        #     probability = np.log(probability)
+        #     probability = np.sum(probability)
 
-        # self.node.get_logger().info(f'SENSOR MODEL: {len(probabilities)}, {np.array(probabilities)}')
-        return np.array(probabilities)
+        #     probabilities.append(np.exp(probability))
 
-        # observation_broadcasted = np.tile(observation, (scans.shape[0], 1))
-        # probabilities_array = self.sensor_model_table[observation_broadcasted, scans]
-        # probabilities = np.prod(probabilities_array, axis=1)
+        # # self.node.get_logger().info(f'SENSOR MODEL: {len(probabilities)}, {np.array(probabilities)}')
+        # return np.array(probabilities)
+
+        observation_broadcasted = np.tile(observation, (scans.shape[0], 1))
+        probabilities_array = self.sensor_model_table[scans, observation_broadcasted]
+        probabilities = np.exp(np.sum(np.log(probabilities_array), axis=1))
 
         return probabilities
         ####################################
