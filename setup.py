@@ -43,6 +43,8 @@ setup(
             'motion_model_test = localization.test.motion_model_test:main',
             'test_drive = localization.test_drive:main',
             'odom_noise = localization.GaussianNoise:main',
+            'unit_test_sensor_model = localization.test_sensor_model:main',
+            'unit_test_motion_model = localization.test_motion_model:main',
         ],
     },
 
